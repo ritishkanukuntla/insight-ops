@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: v1
+description: Helm chart for Hack24 App
+name: hack24-app
+type: application
+version: v1

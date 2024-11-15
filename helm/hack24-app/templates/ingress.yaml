@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ template "hack24-app.name" . }}-ingress
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+      - "app.hack24.test.com"
+    secretName: app-hack24-test-com
+  rules:
+  - host: app.hack24.test.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ template "hack24-app.name" . }}-svc
+            port:
+              number: 80

@@ -1,0 +1,10 @@
+rollout:
+  replicas: 3
+  requests:
+    cpu: 500m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 500Mi
+
+namespace: hack24-app

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: acceptance-tests
+spec:
+  metrics:
+  - name: acceptance-tests
+    provider:
+        job:
+          metadata:
+            name: acceptance-tests
+          spec: 
+            template:
+              spec:
+                containers:
+                - name: hack24-acceptance-tests
+                  image: us.gcr.io/com-ams-cug01-qa/hack24-acceptance-tests:v1
+                  args: ["http://{{ template "hack24-app.name" . }}-canary-svc.{{ .Values.namespace }}.svc.cluster.local/api/status"]
+                restartPolicy: Never
+            backoffLimit: 0

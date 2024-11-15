@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: {{ template "hack24-app.name" . }}-svc-monitor
+  name: {{ template "hack24-app.name" . }}-svc-monitor
+spec:
+  endpoints:
+  - honorLabels: true
+    path: /actuator/prometheus
+    port: http-app-port
+    scheme: http
+    interval: 10s
+    scrapeTimeout: 30s
+  namespaceSelector:
+    matchNames:
+    - {{ .Values.namespace }}
+  selector:
+    matchLabels:
+      app: {{ template "hack24-app.name" . }}-svc
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: {{ template "hack24-app.name" . }}-canary-svc-monitor
+  name: {{ template "hack24-app.name" . }}-canary-svc-monitor
+spec:
+  endpoints:
+  - honorLabels: true
+    path: /actuator/prometheus
+    port: http-app-port
+    scheme: http
+    scrapeTimeout: 30s
+  namespaceSelector:
+    matchNames:
+    - {{ .Values.namespace }}
+  selector:
+    matchLabels:
+      app: {{ template "hack24-app.name" . }}-canary-svc

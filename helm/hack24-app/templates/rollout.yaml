@@ -1,0 +1,101 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ template "hack24-app.name" . }}
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      canaryService: {{ template "hack24-app.name" . }}-canary-svc
+      stableService: {{ template "hack24-app.name" . }}-svc
+      trafficRouting:
+        nginx:
+          stableIngress: {{ template "hack24-app.name" . }}-ingress
+      steps:
+      - setCanaryScale:
+          weight: 100
+      
+      - analysis:
+          templates:
+          - templateName: acceptance-tests
+      
+      - analysis:
+          templates:
+          - templateName: k6-performance-tests
+      
+      - setWeight: 10
+      - pause:
+          duration: 2m
+      - analysis:
+          templates:
+          - templateName: progressive-delivery-anaysis
+      
+      - setWeight: 30
+      - pause:
+          duration: 2m
+      - analysis:
+          templates:
+          - templateName: progressive-delivery-anaysis
+
+      - setWeight: 60
+      - pause:
+          duration: 2m
+      - analysis:
+          templates:
+          - templateName: progressive-delivery-anaysis
+      - setWeight: 100
+      - pause:
+          duration: 2m
+      - analysis:
+          templates:
+          - templateName: progressive-delivery-anaysis
+
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: {{ template "hack24-app.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "hack24-app.name" . }}
+    spec:
+      containers:
+      - image: us.gcr.io/com-ams-cug01-qa/hack24-app:{{ .Chart.Version }}
+        imagePullPolicy: Always
+        # env:
+        #   - name: MANAGEMENT_METRICS_TAGS_APPLICATION
+        #     value: "hack24-app"
+        #   - name: CONFIGURATION_APPLICATION_VERSION
+        #     value: "v4-openjdk"
+        resources:
+          limits:
+            cpu: {{ .Values.rollout.limits.cpu }}
+            memory: {{ .Values.rollout.limits.memory }}
+          requests:
+            cpu: {{ .Values.rollout.requests.cpu }}
+            memory: {{ .Values.rollout.requests.memory }}
+        # Liveness probe definition for app server container
+        livenessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 30
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: http-app-port
+        # Readiness probe definition for app server container
+        readinessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 30
+          successThreshold: 1
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: http-app-port
+        name: {{ template "hack24-app.name" . }}
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: http-app-port

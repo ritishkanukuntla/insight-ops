@@ -1,0 +1,69 @@
+name: Deploy insight-ops hack24-app for demo
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: hack24
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: export-chart-id
+        name: Export Chart ID
+        run: |
+          echo "CHART_ID=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - id: setup-gcloud-auth
+        name: Setup Auth with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - id: setup_cluster_credentials
+        name: Setup Cluster Credentials
+        uses: google-github-actions/get-gke-credentials@main
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER }}
+          location: ${{ vars.GKE_REGION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - id: helm_install
+        name: Helm Install/Upgrade
+        env:
+          CHART_NAME: hack24-app
+          NAMESPACE: hack24-app
+          REPO_NAME: helm-repo
+          HELM_REPO: gs://helm-chart-repo
+
+
+        run: |
+          helm gcs init $HELM_REPO
+          helm repo add $REPO_NAME $HELM_REPO
+          helm repo update
+          export CHART_ID=${{ steps.export-chart-id.outputs.CHART_ID }}
+          helm fetch helm-repo/${CHART_NAME} --version ${CHART_ID}
+          helm upgrade --install ${CHART_NAME} ${CHART_NAME}-${CHART_ID}.tgz --namespace ${NAMESPACE} --debug
+
+      - id: check-rollout-status
+        name: Check rollout status
+        env:
+          CHART_NAME: hack24-app
+          NAMESPACE: hack24-app
+        run: |
+          sleep 5
+          kubectl argo rollouts status ${CHART_NAME} --namespace ${NAMESPACE}
+        continue-on-error: true
+
+      - id: helm-rollback-if-rollout-failed
+        name: Helm Rollback if Rollout Failed
+        env:
+          CHART_NAME: hack24-app
+          NAMESPACE: hack24-app
+        if: steps.check-rollout-status.outcome == 'failure'
+        run: |
+          echo "Performing helm rollback as rollout failed"
+          helm rollback ${CHART_NAME} --namespace ${NAMESPACE}

@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-performance-test-script
+  labels:
+    app: k6-performance-tests
+data:
+  script.js: |
+   import http from 'k6/http';
+   import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+   import { sleep } from 'k6';
+   import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
+   
+   const random_uuid = uuidv4()
+   
+   export const options = {
+       scenarios: {
+          http_ok: {
+              executor: 'ramping-arrival-rate',
+              exec: 'http_ok',
+              startRate: 500,
+              timeUnit: '1s',
+              stages: [
+                  { target: 500, duration: '20s' }, //hold at 500 iters/s for 10s
+                  { target: 0, duration: '10s' } // ramp down back to 0 iters/s over the last 10s
+                ],
+                preAllocatedVUs: 200, // how large the initial pool of VUs would be
+                maxVUs: 300 
+          },
+          http_no_content: {
+              executor: 'ramping-arrival-rate',
+              exec: 'http_no_content',
+              startRate: 500,
+              timeUnit: '1s',
+              stages: [
+                  { target: 500, duration: '20s' }, //hold at 500 iters/s for 10s
+                  { target: 0, duration: '10s' } // ramp down back to 0 iters/s over the last 10s
+                ],
+                preAllocatedVUs: 200, // how large the initial pool of VUs would be
+                maxVUs: 300
+          }
+      },
+       thresholds: {
+         'http_req_failed{scenario: http_ok}': ['rate<0.01'], // http errors should be less than 1%
+         'http_req_duration{scenario: http_ok}': ['avg<1000'], // Average request duration should be less than 400ms
+         
+         'http_req_failed{scenario: http_no_content}': ['rate<0.01'], // http errors should be less than 1%
+         'http_req_duration{scenario: http_no_content}': ['avg<1000'] // Average request duration should be less than 350ms
+       },
+       tags: {
+         testid: random_uuid,
+       },
+       summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(95)', 'p(99)', 'p(99.99)', 'count']
+   };
+   
+   export function http_ok() {
+       http.get('http://{{ template "hack24-app.name" . }}-canary-svc.{{ .Values.namespace }}.svc.cluster.local/api/status/ok');
+   }
+   
+   export function http_no_content() {
+       http.get('http://{{ template "hack24-app.name" . }}-canary-svc.{{ .Values.namespace }}.svc.cluster.local/api/status/no-content');
+   }
+
+   export function print_tag() {
+       console.log("Test Id: " + options.tags.testid)
+   }

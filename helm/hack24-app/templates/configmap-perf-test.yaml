@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-performance-tests
+  labels:
+    app: k6-performance-tests
+data:
+ K6_PROMETHEUS_RW_SERVER_URL: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+ K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "true"
